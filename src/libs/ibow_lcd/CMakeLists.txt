@@ -67,7 +67,7 @@ add_library(lcdetector
 
 target_link_libraries(lcdetector
                       ${OpenCV_LIBRARIES}
-                      ${PROJECT_SOURCE_DIR}/../obindex2/build/lib/libobindex2.a
+                      ${OBINDEX2_LIB}
                       )
 
 set_target_properties(lcdetector PROPERTIES LINK_FLAGS "${CMAKE_CXX_FLAGS}")

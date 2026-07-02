@@ -87,6 +87,8 @@ set(OpenCV_INCLUDE_DIRS
   "${cv_src}/modules/calib3d/include"
   "${cv_src}/modules/objdetect/include"
   "${cv_src}/modules/video/include"
+  "${cv_src}/modules/dnn/include"
+  "${cv_src}/modules/photo/include"
 )
 set(OpenCV_LIBS opencv_core opencv_imgproc opencv_features2d opencv_flann opencv_calib3d opencv_objdetect opencv_video)
 set(OpenCV_LIBRARIES "")
@@ -96,6 +98,17 @@ endforeach()
 EOF
 
   echo "Wrote OpenCVConfig.cmake -> $cv_build/OpenCVConfig.cmake"
+}
+
+find_obindex2_lib() {
+  for p in "$INSTALL_DIR/obindex2/lib/libobindex2.a" "$INSTALL_DIR/obindex2/libobindex2.a"; do
+    if [ -f "$p" ]; then
+      echo "$p"
+      return 0
+    fi
+  done
+  echo "ERROR: libobindex2.a not found under $INSTALL_DIR/obindex2" >&2
+  exit 1
 }
 
 build_EIGEN() {
@@ -148,6 +161,9 @@ build_OBINDEX2() {
 }
 
 build_IBOW_LCD(){
+  local obindex2_lib
+  obindex2_lib="$(find_obindex2_lib)"
+
   rm -rf $INSTALL_DIR/ibow_lcd/
   rm -rf $LIB_ROOT/ibow_lcd/build
   mkdir -p $LIB_ROOT/ibow_lcd/build
@@ -161,7 +177,8 @@ build_IBOW_LCD(){
     -DCMAKE_C_FLAGS="${BUILD_FLAGS} -s USE_BOOST_HEADERS=1" \
     -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/ibow_lcd/ \
     -DBUILD_SHARED_LIBS=OFF \
-    -DOpenCV_DIR=$INSTALL_DIR/opencv
+    -DOpenCV_DIR=$INSTALL_DIR/opencv \
+    -DOBINDEX2_LIB="$obindex2_lib"
   emmake make -j install
 }
 
