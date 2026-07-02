@@ -1,168 +1,136 @@
-# AlvaAR
+# AHAR — AlvaAR SLAM for the Web
 
-AlvaAR is a realtime visual SLAM algorithm running as WebAssembly, in the browser. It is a heavily modified version of the [OV²SLAM](https://github.com/ov2slam/ov2slam) and [ORB-SLAM2](https://github.com/raulmur/ORB_SLAM2) projects. SLAM is the core building block of Augmented Reality applications focusing on world tracking.
+AHAR is a fork of [AlvaAR](https://github.com/alanross/AlvaAR) — realtime visual SLAM running as WebAssembly in the browser. It extends upstream with v1 APIs for 3D map points, tap-to-plane detection, session anchors, and a publishable npm library.
+
+**Upstream:** [alanross/AlvaAR](https://github.com/alanross/AlvaAR) (GPLv3)  
+**Maintainer:** [BlueFish030/AHAR](https://github.com/BlueFish030/AHAR)
+
+See [ATTRIBUTION.md](ATTRIBUTION.md) for third-party credits.
 
 ![image](examples/public/assets/image.gif)
 
+## npm packages
 
-## Examples
-The examples use [ThreeJS](https://threejs.org/) to apply and render the estimated camera pose to a 3d environment.  
+| Package | Description |
+|---------|-------------|
+| `@bluefish030/ahar-slam` | Core WASM bundle + coordinate utilities |
+| `@bluefish030/ahar-slam-three` | `SlamSession` high-level API + Three.js connector |
 
-[Video Demo](https://alanross.github.io/AlvaAR/examples/public/video.html): A desktop browser version using a video file as input.  
-[Camera Demo](https://alanross.github.io/AlvaAR/examples/public/camera.html): The mobile version will access the device camera as input.
+### Install
 
-<img width="75" src="examples/public/assets/qr.png">
-
-### Run with http server
-To run the examples on your local machine, start a simple http server in the examples/ folder:
-
-`$: python 2: python -m SimpleHTTPServer 8080` or   
-`$: python 3: python -m http.server 8080` or  
-`$: emrun --browser chrome ./`
-
-Then open [http://localhost:8080/public/video.html](http://localhost:8080/public/video.html]) in your browser.
-
-### Run with https server
-To run the examples on another device in your local network, they must be served via https. For convenience, a simple https server was added to this project – do not use for production.
-
-#### 1) Install server dependencies
-```
-    $: cd ./AlvaAR/examples/
-    $: npm install
+```bash
+npm install @bluefish030/ahar-slam @bluefish030/ahar-slam-three three
 ```
 
-#### 2) Generate self-signed certificate
-```
-    $: cd ./AlvaAR/examples
-    $: mkdir ssl/
-    $: cd ssl/
-    $: openssl genrsa -des3 -out key.pem 2048
-    $: openssl req -new -sha256 -key key.pem -out cert.csr
-```
-
-#### 3) Run
-```
-    $: cd ./AlvaAR/examples/
-    $: nvm use 13.2
-    $: npm start
-``` 
-Then open [https://YOUR_IP:443/video.html](https://YOUR_IP:443/video.html]) in your browser.
-If met with a <b>ERR_CERT_INVALID</b> error in Chrome,
-try typing <i>badidea</i> or <i>thisisunsafe</i> directly in Chrome on the same page.
-Don’t do this unless the site is one you trust or develop.
-
-
-## Usage
-
-This code shows how to send image data to AlvaAR to compute the camera pose.
+### Quick start
 
 ```javascript
-import { AlvaAR } from 'alva_ar.js';
+import { SlamSession } from "@bluefish030/ahar-slam-three";
+import * as THREE from "three";
 
-const videoOrWebcam = /*...*/;
+const container = document.getElementById("ar");
+const session = await SlamSession.create({
+  container,
+  width: 360,
+  height: 640,
+  fov: 60,
+});
 
-const width = videoOrWebcam.width;
-const height = videoOrWebcam.height;
+await session.startCamera();
+await session.initializeSlam();
 
-const canvas = document.getElementById( 'canvas' );
-const ctx = canvas.getContext( '2d' );
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, 360 / 640, 0.01, 1000);
+camera.rotation.reorder("YXZ");
+const renderer = new THREE.WebGLRenderer({ alpha: true });
+container.appendChild(renderer.domElement);
 
-canvas.width = width;
-canvas.height = height;
+session.startRenderLoop({ scene, camera, renderer });
 
-const alva = await AlvaAR.Initialize( width, height );
-
-function loop()
-{
-    ctx.clearRect( 0, 0, width, height );
-    ctx.drawImage( videoOrWebcam, 0, 0, width, height );
-    
-    const frame = ctx.getImageData( 0, 0, width, height );
-    
-    // cameraPose holds the rotation/translation information where the camera is estimated to be
-    const cameraPose = alva.findCameraPose( frame );
-    
-    // planePose holds the rotation/translation information of a detected plane
-    const planePose = alva.findPlane();
-    
-    // The tracked points in the frame
-    const points = alva.getFramePoints();
-
-    for( const p of points )
-    {
-        ctx.fillRect( p.x, p.y, 2, 2 );
-    }
-};
+// On tap:
+const pose = session.findPlaneAtDisplay(tapX, tapY);
+if (pose) {
+  session.applyPoseToObject(pose, model);
+  session.createAnchor(pose, 1);
+}
 ```
 
+## Demo app
 
-## Build
+Interactive Vite demo with HTTPS for mobile testing:
 
-### Prerequisites
-
-#### Emscripten
-Ensure [Emscripten](https://emscripten.org/docs/getting_started/Tutorial.html) is installed and activated in your session.
-
-```
-    $: source [PATH]/emsdk/emsdk_env.sh 
-    $: emcc -v
+```bash
+npm install
+npm run build:wasm    # requires WSL2 + Emscripten (see Build)
+npm run dev -w packages/demo
 ```
 
-#### C++11 or Higher
-Alva makes use of C++11 features and should thus be compiled with a C++11 or higher flag.
+Open `https://<your-lan-ip>:5173` on iPhone. Modes via query param:
 
-### Dependencies
+- `?mode=camera` — baseline tracking
+- `?mode=mapTap` — tap to place object on surface
+- `?mode=mapPoints` — select 3+ map points for plane
+- `?mode=anchor` — anchor persistence during tracking loss
 
-| Dependency             | Description                                                                                                                                                                                                                                                                                                                                                                                                                         |
-|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Eigen3                 | Download Eigen 3.4. Find all releases [here](https://eigen.tuxfamily.org/index.php?title=Main_Page).This project has been tested with 3.4.0                                                                                                                                                                                                                                                                                         |
-| OpenCV                 | Download OpenCV 4.5. Find all releases [here](https://opencv.org/releases/).This project has been tested with [4.5.5](https://github.com/opencv/opencv/archive/4.5.5.zip).                                                                                                                                                                                                                                                          |
-| iBoW-LCD               | A modified version of [iBoW-LCD](https://github.com/emiliofidalgo/ibow-lcd) is included in the libs folder. It has been turned into a static shared lib. Same goes for [OBIndex2](https://github.com/emiliofidalgo/obindex2), the required dependency for iBoW-LCD. Check the lcdetector.h and lcdetector.cc files to see the modifications w.r.t. to the original code. Both CMakeList have been adjusted to work with Emscripten. |
-| Sophus                 | [Sophus](https://github.com/strasdat/Sophus) is used for _*SE(3), SO(3)*_ elements representation.                                                                                                                                                                                                                                                                                                                                  |
-| Ceres Solver           | [Ceres](https://github.com/ceres-solver/ceres-solver) is used for optimization related operations such as PnP, Bundle Adjustment or PoseGraph Optimization. Note that [Ceres dependencies](http://ceres-solver.org/installation.html) are still required.                                                                                                                                                                           |
-| OpenGV                 | [OpenGV](https://github.com/laurentkneip/opengv) is used for Multi-View-Geometry (MVG) operations.                                                                                                                                                                                                                                                                                                                                  |
+## v1 API surface
 
-#### Build Dependencies
-For convenience, a copy of all required libraries has been included in the libs/ folder. Run the following script to compile all libraries to wasm modules which can be linked into the main project.
+| Method | Description |
+|--------|-------------|
+| `getMapPoints3D()` | Sparse 3D SLAM landmarks |
+| `findPlaneAt(x, y)` | Tap-to-surface via local map cluster |
+| `findPlaneFromPoints(indices)` | Plane from selected map point indices |
+| `createAnchor` / `getAnchorPose` / `clearAnchors` | Session-local anchor poses |
+| `SlamSession` | Camera lifecycle, coordinate conversion, Three.js bridge |
 
-```
-    $: cd ./AlvaAR/src/libs/
-    $: ./build.sh
-```
+`AlvaAR.API_VERSION` is `"1.0.0"`.
 
-#### Build Project
+## Build WASM (WSL2 Ubuntu)
 
-Run the following in your shell before invoking emcmake or emmake:
+Emscripten does not run natively on Windows. Use WSL2:
 
-```
-    $: [PATH]/emsdk/emsdk_env.sh
-```
-
-Then, run the following:
-
-```
-    $: cd ./AlvaAR/src/slam
-    $: mkdir build/
-    $: cd build/
-    $: emcmake cmake .. 
-    $: emmake make install
+```bash
+# In WSL2 — repo at /mnt/c/Users/user/Documents/ME/AHAR
+source ~/emsdk/emsdk_env.sh
+cd src/libs && ./build.sh          # first run ~30–60 min
+cd ../slam && mkdir -p build && cd build
+emcmake cmake .. && emmake make install
+cd ../../..
+npm run copy:wasm
 ```
 
+Or from Windows when WSL is installed:
 
-## Roadmap
-- [ ] Improve the initialisation phase to be more stable and predictable.
-- [ ] Move feature extraction and tracking to GPU.
-- [ ] Blend visual SLAM with IMU data to increase robustness. 
+```powershell
+npm run build:wasm
+```
 
+Or with Docker:
+
+```bash
+npm run build:wasm:docker
+```
+
+Or push to GitHub — the `build-wasm` CI job produces the artifact automatically.
+
+Outputs: `dist/alva_ar.js`, `packages/core/dist/alva_ar.js`
+
+## Legacy examples
+
+Static HTML demos remain in [`examples/`](examples/):
+
+```bash
+cd examples && npm install && npm start
+```
+
+## Known limitations
+
+- GPLv3 copyleft — commercial apps must comply
+- Sparse map, not dense mesh; plane quality depends on scene texture
+- Monocular scale drift — no metric accuracy guarantee
+- Anchors are session-local only
+- iOS requires HTTPS, `playsinline`, and user gesture for camera
+- WASM ~4 MB download on first use
 
 ## License
 
-AlvaAR is released under the [GPLv3 license](https://www.gnu.org/licenses/gpl-3.0.txt).  
-
-OV²SLAM and ORB-SLAM2 are both released under the [GPLv3 license](https://www.gnu.org/licenses/gpl-3.0.txt). Please see 3rd party dependency licenses in libs/.
-
-
-## Contact
-
-Alan Ross: [@alan_ross](https://twitter.com/alan_ross) or [me@aross.io]()  
-Project: [https://github.com/alanross/AlvaAR](https://github.com/alanross/AlvaAR)
+GPL-3.0-or-later. See [LICENSE](LICENSE).

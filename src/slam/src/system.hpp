@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 #include <queue>
+#include <unordered_map>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <Eigen/Core>
@@ -37,8 +38,24 @@ public:
 
     int getFramePoints(int pointsPtr);
 
+    int getMapPoints3D(int pointsPtr, int maxPoints);
+
+    int findPlaneAt(int screenX, int screenY, int posePtr, int numIterations);
+
+    int findPlaneFromPoints(int indicesPtr, int count, int posePtr, int numIterations);
+
+    int createAnchor(int posePtr, int anchorId);
+
+    int getAnchorPose(int anchorId, int posePtr);
+
+    int removeAnchor(int anchorId);
+
+    void clearAnchors();
+
 private:
-    cv::Mat processPlane(std::vector<Eigen::Vector3d> mapPoints, Sophus::SE3d Twc, int numIterations = 50);
+    cv::Mat processPlane(std::vector<Eigen::Vector3d> mapPoints, Sophus::SE3d Twc, int numIterations = 50, bool requireHorizontal = true);
+
+    std::vector<Eigen::Vector3d> selectMapPointsNearRay(int screenX, int screenY, int maxPoints = 32);
 
     int processCameraPose(cv::Mat &image, double timestamp);
 
@@ -50,4 +67,7 @@ private:
     std::unique_ptr<VisualFrontend> visualFrontend_;
     std::shared_ptr<FeatureExtractor> featureExtractor_;
     std::shared_ptr<FeatureTracker> featureTracker_;
+
+    std::unordered_map<int, cv::Mat> anchors_;
+    std::vector<Eigen::Vector3d> cachedMapPoints_;
 };

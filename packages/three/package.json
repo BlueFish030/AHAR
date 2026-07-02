@@ -1,0 +1,23 @@
+{
+  "name": "@bluefish030/ahar-slam-three",
+  "version": "1.0.0",
+  "description": "Three.js SlamSession high-level API for AHAR SLAM",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "three": ">=0.160.0",
+    "@bluefish030/ahar-slam": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BlueFish030/AHAR.git"
+  }
+}

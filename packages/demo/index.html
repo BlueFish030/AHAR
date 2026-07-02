@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <title>AHAR SLAM Demo</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="container"></div>
+      <div id="overlay">
+        <div id="spinner" class="hidden"></div>
+        <button id="start-btn" type="button">Start AR</button>
+        <p id="error" class="hidden"></p>
+      </div>
+      <div id="hud">
+        <span id="status">Ready</span>
+        <span id="mode-label"></span>
+      </div>
+      <footer>AHAR SLAM — GPLv3 — fork of AlvaAR</footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

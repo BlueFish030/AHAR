@@ -1,6 +1,8 @@
 #include "system.hpp"
 #include <memory>
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 
 System::System()
 {
@@ -41,6 +43,9 @@ void System::configure(int imageWidth, int imageHeight, double fx, double fy, do
 void System::reset()
 {
     std::cout << "- [System]: Reset" << std::endl;
+
+    clearAnchors();
+    cachedMapPoints_.clear();
 
     currFrame_->reset();
     visualFrontend_->reset();
@@ -107,7 +112,7 @@ int System::findCameraPose(int imageRGBADataPtr, int posePtr)
 
 int System::findPlane(int locationPtr, int numIterations)
 {
-    cv::Mat mat = processPlane(mapManager_->getCurrentFrameMapPoints(), currFrame_->getTwc(), numIterations);
+    cv::Mat mat = processPlane(mapManager_->getCurrentFrameMapPoints(), currFrame_->getTwc(), numIterations, true);
 
     if (mat.empty())
     {
@@ -119,6 +124,182 @@ int System::findPlane(int locationPtr, int numIterations)
     Utils::toPoseArray(mat, poseData);
 
     return 1;
+}
+
+int System::getMapPoints3D(int pointsPtr, int maxPoints)
+{
+    cachedMapPoints_ = mapManager_->getCurrentFrameMapPoints();
+
+    const int count = std::min(static_cast<int>(cachedMapPoints_.size()), maxPoints);
+    auto *data = reinterpret_cast<float *>(pointsPtr);
+
+    for (int i = 0; i < count; ++i)
+    {
+        data[i * 3 + 0] = static_cast<float>(cachedMapPoints_[i].x());
+        data[i * 3 + 1] = static_cast<float>(cachedMapPoints_[i].y());
+        data[i * 3 + 2] = static_cast<float>(cachedMapPoints_[i].z());
+    }
+
+    return count;
+}
+
+std::vector<Eigen::Vector3d> System::selectMapPointsNearRay(int screenX, int screenY, int maxPoints)
+{
+    const auto mapPoints = mapManager_->getCurrentFrameMapPoints();
+
+    if (mapPoints.empty())
+    {
+        return {};
+    }
+
+    const double fx = cameraCalibration_->fx_;
+    const double fy = cameraCalibration_->fy_;
+    const double cx = cameraCalibration_->cx_;
+    const double cy = cameraCalibration_->cy_;
+
+    Eigen::Vector3d rayCam((screenX - cx) / fx, (screenY - cy) / fy, 1.0);
+    rayCam.normalize();
+
+    const Sophus::SE3d Twc = currFrame_->getTwc();
+    const Eigen::Vector3d rayOrigin = Twc.translation();
+    const Eigen::Vector3d rayDir = Twc.rotationMatrix() * rayCam;
+
+    std::vector<std::pair<double, int>> distances;
+    distances.reserve(mapPoints.size());
+
+    for (int i = 0; i < static_cast<int>(mapPoints.size()); ++i)
+    {
+        const Eigen::Vector3d diff = mapPoints[i] - rayOrigin;
+        const double dist = diff.cross(rayDir).norm();
+        distances.emplace_back(dist, i);
+    }
+
+    std::sort(distances.begin(), distances.end(), [](const auto &a, const auto &b)
+    {
+        return a.first < b.first;
+    });
+
+    const int pickCount = std::min(maxPoints, static_cast<int>(distances.size()));
+    std::vector<Eigen::Vector3d> subset;
+    subset.reserve(pickCount);
+
+    for (int i = 0; i < pickCount; ++i)
+    {
+        subset.push_back(mapPoints[distances[i].second]);
+    }
+
+    return subset;
+}
+
+int System::findPlaneAt(int screenX, int screenY, int posePtr, int numIterations)
+{
+    const auto subset = selectMapPointsNearRay(screenX, screenY, 32);
+
+    if (subset.size() < 3)
+    {
+        return 0;
+    }
+
+    cv::Mat mat = processPlane(subset, currFrame_->getTwc(), numIterations, false);
+
+    if (mat.empty())
+    {
+        return 0;
+    }
+
+    auto *poseData = reinterpret_cast<float *>(posePtr);
+    Utils::toPoseArray(mat, poseData);
+
+    return 1;
+}
+
+int System::findPlaneFromPoints(int indicesPtr, int count, int posePtr, int numIterations)
+{
+    if (count < 3)
+    {
+        return 0;
+    }
+
+    if (cachedMapPoints_.empty())
+    {
+        cachedMapPoints_ = mapManager_->getCurrentFrameMapPoints();
+    }
+
+    if (cachedMapPoints_.empty())
+    {
+        return 0;
+    }
+
+    const auto *indices = reinterpret_cast<const int *>(indicesPtr);
+    std::vector<Eigen::Vector3d> subset;
+    subset.reserve(count);
+
+    for (int i = 0; i < count; ++i)
+    {
+        const int idx = indices[i];
+
+        if (idx < 0 || idx >= static_cast<int>(cachedMapPoints_.size()))
+        {
+            return 0;
+        }
+
+        subset.push_back(cachedMapPoints_[idx]);
+    }
+
+    cv::Mat mat = processPlane(subset, currFrame_->getTwc(), numIterations, false);
+
+    if (mat.empty())
+    {
+        return 0;
+    }
+
+    auto *poseData = reinterpret_cast<float *>(posePtr);
+    Utils::toPoseArray(mat, poseData);
+
+    return 1;
+}
+
+int System::createAnchor(int posePtr, int anchorId)
+{
+    const auto *poseData = reinterpret_cast<const float *>(posePtr);
+
+    cv::Mat pose(4, 4, CV_32F);
+    for (int row = 0; row < 4; ++row)
+    {
+        for (int col = 0; col < 4; ++col)
+        {
+            pose.at<float>(row, col) = poseData[col * 4 + row];
+        }
+    }
+
+    anchors_[anchorId] = pose;
+
+    return 1;
+}
+
+int System::getAnchorPose(int anchorId, int posePtr)
+{
+    const auto it = anchors_.find(anchorId);
+
+    if (it == anchors_.end())
+    {
+        return 0;
+    }
+
+    auto *poseData = reinterpret_cast<float *>(posePtr);
+    Utils::toPoseArray(it->second, poseData);
+
+    return 1;
+}
+
+int System::removeAnchor(int anchorId)
+{
+    return anchors_.erase(anchorId) > 0 ? 1 : 0;
+}
+
+void System::clearAnchors()
+{
+    anchors_.clear();
 }
 
 int System::getFramePoints(int pointsPtr)
@@ -159,7 +340,7 @@ int System::processCameraPose(cv::Mat &image, double timestamp)
     return 1;
 }
 
-cv::Mat System::processPlane(std::vector<Eigen::Vector3d> mapPoints, Sophus::SE3d Twc, int numIterations)
+cv::Mat System::processPlane(std::vector<Eigen::Vector3d> mapPoints, Sophus::SE3d Twc, int numIterations, bool requireHorizontal)
 {
     cv::Mat planePose;
 
@@ -292,15 +473,43 @@ cv::Mat System::processPlane(std::vector<Eigen::Vector3d> mapPoints, Sophus::SE3
     const float nz = c * f;
 
     cv::Mat normal = (cv::Mat_<float>(3, 1) << nx, ny, nz);
-    cv::Mat up = (cv::Mat_<float>(3, 1) << 0.0f, 1.0f, 0.0f);
-    cv::Mat v = up.cross(normal);
-    const float sa = cv::norm(v);
-    const float ca = up.dot(normal);
-    const float ang = atan2(sa, ca);
+
+    if (requireHorizontal && std::fabs(ny) < 0.7f)
+    {
+        std::cout << "- [System]: Plane rejected (not horizontal): ny=" << ny << std::endl;
+        return planePose;
+    }
 
     planePose = cv::Mat::eye(4, 4, CV_32F);
 
-    planePose.rowRange(0, 3).colRange(0, 3) = Utils::expSO3(v * ang / sa) * Utils::expSO3(up * rang);
+    if (requireHorizontal)
+    {
+        cv::Mat up = (cv::Mat_<float>(3, 1) << 0.0f, 1.0f, 0.0f);
+        cv::Mat v = up.cross(normal);
+        const float sa = cv::norm(v);
+        const float ca = up.dot(normal);
+        const float ang = atan2(sa, ca);
+
+        planePose.rowRange(0, 3).colRange(0, 3) = Utils::expSO3(v * ang / sa) * Utils::expSO3(up * rang);
+    }
+    else
+    {
+        cv::Mat yAxis = normal / cv::norm(normal);
+        cv::Mat ref = (std::fabs(yAxis.at<float>(1)) < 0.9f)
+            ? (cv::Mat_<float>(3, 1) << 0.0f, 1.0f, 0.0f)
+            : (cv::Mat_<float>(3, 1) << 1.0f, 0.0f, 0.0f);
+        cv::Mat xAxis = ref.cross(yAxis);
+        xAxis = xAxis / cv::norm(xAxis);
+        cv::Mat zAxis = xAxis.cross(yAxis);
+        zAxis = zAxis / cv::norm(zAxis);
+
+        cv::Mat rot(3, 3, CV_32F);
+        xAxis.copyTo(rot.col(0));
+        yAxis.copyTo(rot.col(1));
+        zAxis.copyTo(rot.col(2));
+        rot.copyTo(planePose.rowRange(0, 3).colRange(0, 3));
+    }
+
     origin.copyTo(planePose.col(3).rowRange(0, 3));
 
     return planePose;

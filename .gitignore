@@ -7,8 +7,11 @@
 !.prettierrc
 !.eslintignore
 !.buildpacks
+!.github
 
 node_modules
+*.tgz
+packages/demo/dist
 __pycache__
 
 build/*

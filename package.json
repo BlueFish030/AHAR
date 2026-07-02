@@ -1,0 +1,24 @@
+{
+  "name": "ahar-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build:wasm": "wsl bash scripts/build-wasm.sh",
+    "build:wasm:linux": "bash scripts/build-wasm.sh",
+    "build:wasm:docker": "docker build -f Dockerfile.wasm -t ahar-wasm . && docker create --name ahar-wasm-out ahar-wasm && docker cp ahar-wasm-out:/src/packages/core/dist/alva_ar.js packages/core/dist/alva_ar.js && docker cp ahar-wasm-out:/src/dist/alva_ar.js dist/alva_ar.js && docker rm ahar-wasm-out",
+    "sync:postjs": "node scripts/sync-post-js.js",
+    "copy:wasm": "node scripts/copy-wasm.js",
+    "verify": "node scripts/verify-api-version.js",
+    "dev": "npm run dev -w @bluefish030/ahar-slam-demo",
+    "lint": "eslint packages/core/src packages/three/src packages/demo/src",
+    "postinstall": "node scripts/copy-wasm.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.17.0"
+  },
+  "license": "GPL-3.0-or-later"
+}

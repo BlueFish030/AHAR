@@ -13,7 +13,8 @@ var Module=typeof AlvaARWasm!="undefined"?AlvaARWasm:{};var readyPromiseResolve,
 }
 );
 })();
-export default AlvaARWasm;class SharedMemory
+export default AlvaARWasm;
+class SharedMemory
 {
     constructor( wasm, type, size )
     {
@@ -59,6 +60,8 @@ export default AlvaARWasm;class SharedMemory
 
 class AlvaAR
 {
+    static API_VERSION = "1.0.0";
+
     static async Initialize( width, height, fov = 45 )
     {
         const wasm = {};
@@ -78,6 +81,8 @@ class AlvaAR
         this.memCam = new SharedMemory( wasm.module, wasm.module.HEAPF32, 16 );
         this.memObj = new SharedMemory( wasm.module, wasm.module.HEAPF32, 16 );
         this.memPts = new SharedMemory( wasm.module, wasm.module.HEAPU32, 4096 );
+        this.memMap3D = new SharedMemory( wasm.module, wasm.module.HEAPF32, 2048 * 3 );
+        this.memIndices = new SharedMemory( wasm.module, wasm.module.HEAPU32, 4096 );
         this.memIMU = new SharedMemory( wasm.module, wasm.module.HEAPF64, 256 );
         this.memImg = new SharedMemory( wasm.module, wasm.module.HEAPU8, width * height * 4 );
 
@@ -245,6 +250,101 @@ class AlvaAR
         return points;
     }
 
+    getMapPoints3D( maxPoints = 2048 )
+    {
+        const count = this.system.getMapPoints3D( this.memMap3D.ptr, maxPoints );
+
+        const points = new Array( count );
+
+        if( count > 0 )
+        {
+            const data = this.memMap3D.read( count * 3 );
+
+            for( let i = 0, j = 0; i < count; i++ )
+            {
+                points[i] = { x: data[j++], y: data[j++], z: data[j++] };
+            }
+        }
+
+        return points;
+    }
+
+    findPlaneAt( screenX, screenY, numIterations = 250 )
+    {
+        const status = this.system.findPlaneAt( screenX, screenY, this.memObj.ptr, numIterations );
+
+        if( status === 1 )
+        {
+            return this.memObj.read( 16 );
+        }
+
+        return null;
+    }
+
+    findPlaneFromPoints( indices, numIterations = 250 )
+    {
+        if( !indices || indices.length < 3 )
+        {
+            return null;
+        }
+
+        this.memIndices.write( indices );
+
+        const status = this.system.findPlaneFromPoints(
+            this.memIndices.ptr,
+            indices.length,
+            this.memObj.ptr,
+            numIterations
+        );
+
+        if( status === 1 )
+        {
+            return this.memObj.read( 16 );
+        }
+
+        return null;
+    }
+
+    createAnchor( pose16, anchorId = 1 )
+    {
+        this.memObj.write( pose16 );
+
+        return this.system.createAnchor( this.memObj.ptr, anchorId );
+    }
+
+    getAnchorPose( anchorId )
+    {
+        const status = this.system.getAnchorPose( anchorId, this.memObj.ptr );
+
+        if( status === 1 )
+        {
+            return this.memObj.read( 16 );
+        }
+
+        return null;
+    }
+
+    removeAnchor( anchorId )
+    {
+        return this.system.removeAnchor( anchorId );
+    }
+
+    clearAnchors()
+    {
+        this.system.clearAnchors();
+    }
+
+    dispose()
+    {
+        this.memCam.dispose();
+        this.memObj.dispose();
+        this.memPts.dispose();
+        this.memMap3D.dispose();
+        this.memIndices.dispose();
+        this.memIMU.dispose();
+        this.memImg.dispose();
+    }
+
     reset()
     {
         this.system.reset();
@@ -252,3 +352,4 @@ class AlvaAR
 }
 
 export { AlvaAR };
+export const API_VERSION = AlvaAR.API_VERSION;
