@@ -50,6 +50,52 @@ build_OPENCV() {
   rm -rf $INSTALL_DIR/opencv/
 
   python3 "$LIB_ROOT/opencv/platforms/js/build_js.py" "$INSTALL_DIR/opencv" --build_wasm $CONF_OPENCV --emscripten_dir "$EMSCRIPTEN_DIR"
+
+  # WASM build tree has static libs in lib/ but no installed OpenCVConfig.cmake
+  write_opencv_config
+}
+
+write_opencv_config() {
+  local cv_build="$INSTALL_DIR/opencv"
+  local cv_src="$LIB_ROOT/opencv"
+  local cv_lib="$cv_build/lib"
+
+  if [ ! -f "$cv_lib/libopencv_core.a" ]; then
+    echo "OpenCV static libs missing — building module archives"
+    (cd "$cv_build" && emmake make -j \
+      opencv_core opencv_imgproc opencv_features2d opencv_flann \
+      opencv_calib3d opencv_objdetect opencv_video)
+  fi
+
+  test -f "$cv_lib/libopencv_core.a" || {
+    echo "ERROR: $cv_lib/libopencv_core.a not found after OpenCV WASM build"
+    exit 1
+  }
+
+  cat > "$cv_build/OpenCVConfig.cmake" << EOF
+set(OpenCV_FOUND TRUE)
+set(OpenCV_VERSION "4.5.5")
+set(OpenCV_INSTALL_PATH "${cv_build}")
+set(OpenCV_LIB_DIR "${cv_lib}")
+set(OpenCV_INCLUDE_DIRS
+  "${cv_build}"
+  "${cv_src}/include"
+  "${cv_src}/modules/core/include"
+  "${cv_src}/modules/imgproc/include"
+  "${cv_src}/modules/features2d/include"
+  "${cv_src}/modules/flann/include"
+  "${cv_src}/modules/calib3d/include"
+  "${cv_src}/modules/objdetect/include"
+  "${cv_src}/modules/video/include"
+)
+set(OpenCV_LIBS opencv_core opencv_imgproc opencv_features2d opencv_flann opencv_calib3d opencv_objdetect opencv_video)
+set(OpenCV_LIBRARIES "")
+foreach(_lib \${OpenCV_LIBS})
+  list(APPEND OpenCV_LIBRARIES "\${OpenCV_LIB_DIR}/lib\${_lib}.a")
+endforeach()
+EOF
+
+  echo "Wrote OpenCVConfig.cmake -> $cv_build/OpenCVConfig.cmake"
 }
 
 build_EIGEN() {
@@ -79,6 +125,10 @@ EOF
 }
 
 build_OBINDEX2() {
+  if [ -f "$INSTALL_DIR/opencv/lib/libopencv_core.a" ] && [ ! -f "$INSTALL_DIR/opencv/OpenCVConfig.cmake" ]; then
+    write_opencv_config
+  fi
+
   rm -rf $INSTALL_DIR/obindex2/
   rm -rf $LIB_ROOT/obindex2/build
   mkdir -p $LIB_ROOT/obindex2/build
@@ -92,7 +142,7 @@ build_OBINDEX2() {
     -DCMAKE_C_FLAGS="${BUILD_FLAGS} -s USE_BOOST_HEADERS=1" \
     -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/obindex2/ \
     -DBUILD_SHARED_LIBS=OFF \
-    -DOpenCV_DIR=$INSTALL_DIR/opencv/lib/cmake/opencv4 \
+    -DOpenCV_DIR=$INSTALL_DIR/opencv \
     -DEnableTesting=OFF
   emmake make -j install
 }
@@ -111,7 +161,7 @@ build_IBOW_LCD(){
     -DCMAKE_C_FLAGS="${BUILD_FLAGS} -s USE_BOOST_HEADERS=1" \
     -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/ibow_lcd/ \
     -DBUILD_SHARED_LIBS=OFF \
-    -DOpenCV_DIR=$INSTALL_DIR/opencv/lib/cmake/opencv4
+    -DOpenCV_DIR=$INSTALL_DIR/opencv
   emmake make -j install
 }
 
@@ -195,5 +245,11 @@ build() {
 }
 
 libsToBuild=( "EIGEN" "OPENCV" "OBINDEX2" "IBOW_LCD" "SOPHUS" "CERES" "OPENGV" )
+
+# Standalone: bash build.sh opencv-config
+if [ "${1:-}" = "opencv-config" ]; then
+  write_opencv_config
+  exit 0
+fi
 
 build ${libsToBuild[@]}

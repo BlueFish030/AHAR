@@ -53,18 +53,22 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src/libs/build
-          key: ahar-libs-v5-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt') }}
-          restore-keys: ahar-libs-v5-
+          key: ahar-libs-v6-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt') }}
+          restore-keys: ahar-libs-v6-
 
       - name: Build native dependencies
         run: |
           source emsdk/emsdk_env.sh
           export EMSDK="${{ github.workspace }}/emsdk"
           cd src/libs
-          if [ ! -f build/opencv/lib/libopencv_core.a ]; then
+          if [ -f build/opencv/lib/libopencv_core.a ] && [ ! -f build/opencv/OpenCVConfig.cmake ]; then
+            bash ./build.sh opencv-config
+          fi
+          if [ ! -f build/opengv/lib/libopengv.a ]; then
             bash ./build.sh
           fi
-          test -f build/opencv/lib/libopencv_core.a
+          test -f build/opencv/OpenCVConfig.cmake
+          test -f build/opengv/lib/libopengv.a
 
       - name: Build WASM
         run: |
