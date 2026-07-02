@@ -53,8 +53,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src/libs/build
-          key: ahar-libs-v6-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt') }}
-          restore-keys: ahar-libs-v6-
+          key: ahar-libs-v7-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt', 'src/libs/obindex2/lib/**') }}
+          restore-keys: ahar-libs-v7-
 
       - name: Build native dependencies
         run: |

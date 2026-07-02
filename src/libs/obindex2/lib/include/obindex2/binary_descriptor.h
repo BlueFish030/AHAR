@@ -20,8 +20,10 @@
 #ifndef LIB_INCLUDE_OBINDEX2_BINARY_DESCRIPTOR_H_
 #define LIB_INCLUDE_OBINDEX2_BINARY_DESCRIPTOR_H_
 
+#include <algorithm>
 #include <bitset>
 #include <memory>
+#include <set>
 #include <string>
 #include <sstream>
 #include <unordered_set>
@@ -30,6 +32,12 @@
 #include <opencv2/core.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/core/hal/hal.hpp>
+
+// Emscripten Boost/OpenCV headers can define a `set` macro that breaks std::set
+// and member names like setLeaf / setBad.
+#ifdef set
+#undef set
+#endif
 
 namespace obindex2 {
 
