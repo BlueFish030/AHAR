@@ -92,7 +92,8 @@ build_OBINDEX2() {
     -DCMAKE_C_FLAGS="${BUILD_FLAGS} -s USE_BOOST_HEADERS=1" \
     -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/obindex2/ \
     -DBUILD_SHARED_LIBS=OFF \
-    -DOpenCV_DIR=$LIB_ROOT/opencv/build/
+    -DOpenCV_DIR=$INSTALL_DIR/opencv/lib/cmake/opencv4 \
+    -DEnableTesting=OFF
   emmake make -j install
 }
 
@@ -110,7 +111,7 @@ build_IBOW_LCD(){
     -DCMAKE_C_FLAGS="${BUILD_FLAGS} -s USE_BOOST_HEADERS=1" \
     -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/ibow_lcd/ \
     -DBUILD_SHARED_LIBS=OFF \
-    -DOpenCV_DIR=$LIB_ROOT/opencv/build/
+    -DOpenCV_DIR=$INSTALL_DIR/opencv/lib/cmake/opencv4
   emmake make -j install
 }
 

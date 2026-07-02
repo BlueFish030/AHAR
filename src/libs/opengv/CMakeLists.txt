@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.1.3)
 project(opengv VERSION 1.0 LANGUAGES CXX)
 
-set(CMAKE_TOOLCHAIN_FILE "~/Development/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake")
+if(NOT CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "~/Development/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake")
+endif()
 
 # Set the build type.  Options are:
 #
@@ -37,8 +39,8 @@ ELSE()
   ELSEIF (CMAKE_SYSTEM_PROCESSOR MATCHES 
           "(arm)|(ARM)|(armhf)|(ARMHF)|(armel)|(ARMEL)")
     add_definitions (-march=armv7-a)
-  ELSE ()
-    add_definitions (-march=native) #TODO use correct c++11 def once everybody has moved to gcc 4.7 # for now I even removed std=gnu++0x
+  ELSEIF(NOT EMSCRIPTEN)
+    add_definitions (-march=native)
   ENDIF()
   add_definitions (
     -O3
