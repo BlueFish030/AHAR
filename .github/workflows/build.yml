@@ -7,16 +7,41 @@ on:
     branches: [main, IMU]
   workflow_dispatch:
 
+env:
+  EMSDK_VERSION: 3.1.50
+
 jobs:
   build-wasm:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Emscripten
-        uses: mymind/emscripten-action@v1
+      - name: Cache emsdk
+        uses: actions/cache@v4
+        id: emsdk-cache
         with:
-          version: "3.1.50"
+          path: emsdk
+          key: emsdk-${{ env.EMSDK_VERSION }}
+
+      - name: Install Emscripten
+        if: steps.emsdk-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/emscripten-core/emsdk.git
+          cd emsdk
+          ./emsdk install ${{ env.EMSDK_VERSION }}
+          ./emsdk activate ${{ env.EMSDK_VERSION }}
+
+      - name: Activate Emscripten
+        run: |
+          cd emsdk
+          ./emsdk activate ${{ env.EMSDK_VERSION }}
+          echo "${{ github.workspace }}/emsdk/upstream/emscripten" >> "$GITHUB_PATH"
+          echo "EMSDK=${{ github.workspace }}/emsdk" >> "$GITHUB_ENV"
+
+      - name: Verify emcc
+        run: |
+          source emsdk/emsdk_env.sh
+          emcc -v
 
       - name: Cache native deps
         uses: actions/cache@v4
@@ -27,6 +52,7 @@ jobs:
 
       - name: Build native dependencies
         run: |
+          source emsdk/emsdk_env.sh
           cd src/libs
           if [ ! -f build/opencv/lib/libopencv_core.a ]; then
             ./build.sh
@@ -34,6 +60,7 @@ jobs:
 
       - name: Build WASM
         run: |
+          source emsdk/emsdk_env.sh
           mkdir -p src/slam/build
           cd src/slam/build
           emcmake cmake ..
