@@ -111,6 +111,63 @@ find_obindex2_lib() {
   exit 1
 }
 
+read_eigen_version() {
+  local macros="$LIB_ROOT/eigen/Eigen/src/Core/util/Macros.h"
+  local w m n
+  w=$(grep -E '#define[[:space:]]+EIGEN_WORLD_VERSION[[:space:]]+' "$macros" | awk '{print $3}')
+  m=$(grep -E '#define[[:space:]]+EIGEN_MAJOR_VERSION[[:space:]]+' "$macros" | awk '{print $3}')
+  n=$(grep -E '#define[[:space:]]+EIGEN_MINOR_VERSION[[:space:]]+' "$macros" | awk '{print $3}')
+  echo "${w}.${m}.${n}"
+}
+
+write_eigen_config() {
+  local eigen_root="$INSTALL_DIR/eigen"
+  local eigen_cmake="$eigen_root/share/eigen3/cmake"
+  local eigen_version
+  eigen_version="$(read_eigen_version)"
+
+  test -d "$eigen_root/include/eigen3/Eigen" || {
+    echo "ERROR: Eigen headers missing under $eigen_root/include/eigen3"
+    exit 1
+  }
+
+  mkdir -p "$eigen_cmake"
+  cat > "$eigen_cmake/Eigen3Config.cmake" << EOF
+set(EIGEN3_FOUND TRUE)
+set(Eigen3_FOUND TRUE)
+set(EIGEN3_INCLUDE_DIR "\${CMAKE_CURRENT_LIST_DIR}/../../../include/eigen3")
+set(EIGEN3_INCLUDE_DIRS "\${EIGEN3_INCLUDE_DIR}")
+set(Eigen3_INCLUDE_DIR "\${EIGEN3_INCLUDE_DIR}")
+set(EIGEN3_VERSION_STRING "${eigen_version}")
+set(Eigen3_VERSION "${eigen_version}")
+
+if(NOT TARGET Eigen3::Eigen)
+  add_library(Eigen3::Eigen INTERFACE IMPORTED)
+  set_target_properties(Eigen3::Eigen PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "\${EIGEN3_INCLUDE_DIR}")
+endif()
+EOF
+
+  cat > "$eigen_cmake/Eigen3ConfigVersion.cmake" << EOF
+set(PACKAGE_VERSION "${eigen_version}")
+
+if(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION)
+  set(PACKAGE_VERSION_COMPATIBLE FALSE)
+else()
+  set(PACKAGE_VERSION_COMPATIBLE TRUE)
+  if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
+    set(PACKAGE_VERSION_EXACT TRUE)
+  endif()
+endif()
+EOF
+
+  mkdir -p "$LIB_ROOT/eigen/build"
+  cp "$eigen_cmake/Eigen3Config.cmake" "$LIB_ROOT/eigen/build/Eigen3Config.cmake"
+  cp "$eigen_cmake/Eigen3ConfigVersion.cmake" "$LIB_ROOT/eigen/build/Eigen3ConfigVersion.cmake"
+
+  echo "Wrote Eigen3Config.cmake (${eigen_version}) -> $eigen_cmake"
+}
+
 build_EIGEN() {
   # Header-only: vendored Eigen is missing scripts/buildtests.in required by cmake.
   echo "Installing Eigen (header-only)"
@@ -122,19 +179,7 @@ build_EIGEN() {
     cp -r "$LIB_ROOT/eigen/unsupported" "$INSTALL_DIR/eigen/include/eigen3/"
   fi
 
-  mkdir -p "$INSTALL_DIR/eigen/share/eigen3/cmake"
-  cat > "$INSTALL_DIR/eigen/share/eigen3/cmake/Eigen3Config.cmake" << 'EOF'
-if(NOT TARGET Eigen3::Eigen)
-  add_library(Eigen3::Eigen INTERFACE IMPORTED)
-  set_target_properties(Eigen3::Eigen PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../../include/eigen3")
-endif()
-set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../include/eigen3")
-set(EIGEN3_FOUND TRUE)
-EOF
-
-  mkdir -p "$LIB_ROOT/eigen/build"
-  cp "$INSTALL_DIR/eigen/share/eigen3/cmake/Eigen3Config.cmake" "$LIB_ROOT/eigen/build/Eigen3Config.cmake"
+  write_eigen_config
 }
 
 build_OBINDEX2() {
@@ -263,9 +308,14 @@ build() {
 
 libsToBuild=( "EIGEN" "OPENCV" "OBINDEX2" "IBOW_LCD" "SOPHUS" "CERES" "OPENGV" )
 
-# Standalone: bash build.sh opencv-config
+# Standalone: bash build.sh opencv-config | eigen-config
 if [ "${1:-}" = "opencv-config" ]; then
   write_opencv_config
+  exit 0
+fi
+
+if [ "${1:-}" = "eigen-config" ]; then
+  write_eigen_config
   exit 0
 fi
 

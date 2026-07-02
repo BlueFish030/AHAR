@@ -53,8 +53,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src/libs/build
-          key: ahar-libs-v7-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt', 'src/libs/obindex2/lib/**') }}
-          restore-keys: ahar-libs-v7-
+          key: ahar-libs-v8-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt', 'src/libs/obindex2/lib/**') }}
+          restore-keys: ahar-libs-v8-
 
       - name: Build native dependencies
         run: |
@@ -64,10 +64,14 @@ jobs:
           if [ -f build/opencv/lib/libopencv_core.a ] && [ ! -f build/opencv/OpenCVConfig.cmake ]; then
             bash ./build.sh opencv-config
           fi
+          if [ -d build/eigen/include/eigen3/Eigen ] && [ ! -f build/eigen/share/eigen3/cmake/Eigen3ConfigVersion.cmake ]; then
+            bash ./build.sh eigen-config
+          fi
           if [ ! -f build/opengv/lib/libopengv.a ]; then
             bash ./build.sh
           fi
           test -f build/opencv/OpenCVConfig.cmake
+          test -f build/eigen/share/eigen3/cmake/Eigen3ConfigVersion.cmake
           test -f build/opengv/lib/libopengv.a
 
       - name: Build WASM
