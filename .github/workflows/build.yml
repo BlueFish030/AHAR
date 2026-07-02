@@ -85,6 +85,7 @@ jobs:
           cd ../../..
           node scripts/sync-post-js.js
           node scripts/copy-wasm.js
+          node scripts/verify-wasm-exports.js
 
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
@@ -113,16 +114,7 @@ jobs:
       - run: npm ci
 
       - name: Verify WASM exports
-        run: |
-          node -e "
-          const fs = require('fs');
-          const s = fs.readFileSync('dist/alva_ar.js','utf8');
-          const wasm = s.slice(0, s.indexOf('class SharedMemory'));
-          for (const fn of ['getMapPoints3D','findPlaneAt','createAnchor']) {
-            if (!wasm.includes(fn)) throw new Error('WASM missing export: ' + fn);
-          }
-          console.log('WASM export check OK');
-          "
+        run: node scripts/verify-wasm-exports.js
 
       - name: Verify API version
         run: node scripts/verify-api-version.js
