@@ -23,8 +23,13 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <cassert>
+#include <cfloat>
 #include <limits>
+#include <memory>
+#include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "obindex2/binary_descriptor.h"
 #include "obindex2/priority_queues.h"

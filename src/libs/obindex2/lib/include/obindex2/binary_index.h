@@ -22,6 +22,8 @@
 
 #include <list>
 #include <mutex>
+#include <cassert>
+#include <iterator>
 #include <unordered_map>
 #include <vector>
 

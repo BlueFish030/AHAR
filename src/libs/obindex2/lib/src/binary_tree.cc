@@ -17,6 +17,8 @@
 * along with obindex2. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <iostream>
+
 #include "obindex2/binary_tree.h"
 
 namespace obindex2 {
