@@ -53,20 +53,29 @@ build_OPENCV() {
 }
 
 build_EIGEN() {
+  # Header-only: vendored Eigen is missing scripts/buildtests.in required by cmake.
+  echo "Installing Eigen (header-only)"
   rm -rf $INSTALL_DIR/eigen/
   rm -rf $LIB_ROOT/eigen/build
-  mkdir -p $LIB_ROOT/eigen/build
+  mkdir -p "$INSTALL_DIR/eigen/include/eigen3"
+  cp -r "$LIB_ROOT/eigen/Eigen" "$INSTALL_DIR/eigen/include/eigen3/"
+  if [ -d "$LIB_ROOT/eigen/unsupported" ]; then
+    cp -r "$LIB_ROOT/eigen/unsupported" "$INSTALL_DIR/eigen/include/eigen3/"
+  fi
 
-  cd $LIB_ROOT/eigen/build
-  emcmake cmake .. \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_CXX_STANDARD=17 \
-    -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN_CMAKE_DIR \
-    -DCMAKE_CXX_FLAGS="${BUILD_FLAGS}" \
-    -DCMAKE_C_FLAGS="${BUILD_FLAGS}" \
-    -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/eigen/ \
-    -DBUILD_SHARED_LIBS=OFF
-  emmake make -j install
+  mkdir -p "$INSTALL_DIR/eigen/share/eigen3/cmake"
+  cat > "$INSTALL_DIR/eigen/share/eigen3/cmake/Eigen3Config.cmake" << 'EOF'
+if(NOT TARGET Eigen3::Eigen)
+  add_library(Eigen3::Eigen INTERFACE IMPORTED)
+  set_target_properties(Eigen3::Eigen PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../../../include/eigen3")
+endif()
+set(EIGEN3_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/../../../include/eigen3")
+set(EIGEN3_FOUND TRUE)
+EOF
+
+  mkdir -p "$LIB_ROOT/eigen/build"
+  cp "$INSTALL_DIR/eigen/share/eigen3/cmake/Eigen3Config.cmake" "$LIB_ROOT/eigen/build/Eigen3Config.cmake"
 }
 
 build_OBINDEX2() {
@@ -145,15 +154,16 @@ build_CERES(){
     -DEIGENSPARSE:BOOL=1 \
     -DCERES_THREADING_MODEL="NO_THREADS" \
     -DMINIGLOG:BOOL=1 \
-    -DEigen3_DIR=$LIB_ROOT/eigen/build/
+    -DEigen3_DIR=$INSTALL_DIR/eigen/share/eigen3/cmake/
   emmake make -j install
-  find $INSTALL_DIR/ceres-solver/include -type f -name '*.h' -exec sed -i '' s#glog/logging.h#ceres/internal/miniglog/glog/logging.h#g {} +
+  find $INSTALL_DIR/ceres-solver/include -type f -name '*.h' -exec sed -i.bak 's#glog/logging.h#ceres/internal/miniglog/glog/logging.h#g' {} +
+  find $INSTALL_DIR/ceres-solver/include -type f -name '*.bak' -delete
 }
 
 build_OPENGV(){
   rm -rf $INSTALL_DIR/opengv/
   rm -rf $LIB_ROOT/opengv/build
-  mkdir $LIB_ROOT/opengv/build
+  mkdir -p $LIB_ROOT/opengv/build
 
   cd $LIB_ROOT/opengv/build
   emcmake cmake .. \
