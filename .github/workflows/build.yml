@@ -13,6 +13,7 @@ env:
 jobs:
   build-wasm:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -43,12 +44,17 @@ jobs:
           source emsdk/emsdk_env.sh
           emcc -v
 
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip ninja-build
+
       - name: Cache native deps
         uses: actions/cache@v4
         with:
           path: src/libs/build
-          key: ahar-libs-v2-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt') }}
-          restore-keys: ahar-libs-v2-
+          key: ahar-libs-v3-${{ hashFiles('src/libs/build.sh', 'src/libs/**/CMakeLists.txt') }}
+          restore-keys: ahar-libs-v3-
 
       - name: Build native dependencies
         run: |

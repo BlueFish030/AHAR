@@ -49,7 +49,7 @@ build_OPENCV() {
 
   rm -rf $INSTALL_DIR/opencv/
 
-  python $LIB_ROOT/opencv/platforms/js/build_js.py $INSTALL_DIR/opencv --build_wasm $CONF_OPENCV --emscripten_dir $EMSCRIPTEN_DIR
+  python3 "$LIB_ROOT/opencv/platforms/js/build_js.py" "$INSTALL_DIR/opencv" --build_wasm $CONF_OPENCV --emscripten_dir "$EMSCRIPTEN_DIR"
 }
 
 build_EIGEN() {
@@ -129,15 +129,15 @@ build_CERES(){
 
   rm -rf $INSTALL_DIR/ceres-solver/
   rm -rf $LIB_ROOT/ceres-solver/build
-  mkdir $LIB_ROOT/ceres-solver/build
+  mkdir -p $LIB_ROOT/ceres-solver/build
 
   cd $LIB_ROOT/ceres-solver/build
   emcmake cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_CXX_STANDARD=17 \
     -DCMAKE_TOOLCHAIN_FILE=$EMSCRIPTEN_CMAKE_DIR \
-    -DCMAKE_CXX_FLAGS="${BUILD_FLAGS} -march=native" \
-    -DCMAKE_C_FLAGS="${BUILD_FLAGS} -march=native" \
+    -DCMAKE_CXX_FLAGS="${BUILD_FLAGS}" \
+    -DCMAKE_C_FLAGS="${BUILD_FLAGS}" \
     -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR/ceres-solver/ \
     -DBUILD_SHARED_LIBS=OFF \
     -DBUILD_EXAMPLES:BOOL=0 \
