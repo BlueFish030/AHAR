@@ -90,7 +90,8 @@ Emscripten does not run natively on Windows. Use WSL2:
 
 ```bash
 # In WSL2 — repo at /mnt/c/Users/user/Documents/ME/AHAR
-source ~/emsdk/emsdk_env.sh
+export EMSDK="$HOME/emsdk"
+source "$EMSDK/emsdk_env.sh"
 cd src/libs && ./build.sh          # first run ~30–60 min
 cd ../slam && mkdir -p build && cd build
 emcmake cmake .. && emmake make install

@@ -92,7 +92,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
       -s SINGLE_FILE=1 \
       -s ASSERTIONS=1 \
       -s DYLINK_DEBUG=1 \
-      -s LLD_REPORT_UNDEFINED=1 \
       -s ERROR_ON_UNDEFINED_SYMBOLS=1 \
       -s DISABLE_EXCEPTION_CATCHING=0 \
       -s USE_ZLIB=1 \
@@ -119,7 +118,6 @@ else ()
       -s SINGLE_FILE=1 \
       -s ASSERTIONS=0 \
       -s DYLINK_DEBUG=0 \
-      -s LLD_REPORT_UNDEFINED=0 \
       -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
       -s DISABLE_EXCEPTION_CATCHING=0 \
       -s USE_ZLIB=1 \

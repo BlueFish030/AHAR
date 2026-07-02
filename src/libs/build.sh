@@ -1,10 +1,23 @@
 #!/bin/bash
+set -euo pipefail
 
 # The lib directory
 LIB_ROOT=$PWD
 
-# Ensure this is adjusted to your local emsdk path
-EMSCRIPTEN_DIR=~/Development/emsdk/upstream/emscripten
+# Emscripten path: EMSDK env (CI/WSL), or legacy local install
+if [ -n "${EMSDK:-}" ] && [ -d "${EMSDK}/upstream/emscripten" ]; then
+  EMSCRIPTEN_DIR="${EMSDK}/upstream/emscripten"
+elif [ -n "${EMSCRIPTEN:-}" ] && [ -d "${EMSCRIPTEN}" ]; then
+  EMSCRIPTEN_DIR="${EMSCRIPTEN}"
+else
+  EMSCRIPTEN_DIR="${HOME}/Development/emsdk/upstream/emscripten"
+fi
+
+if [ ! -d "$EMSCRIPTEN_DIR" ]; then
+  echo "Emscripten not found at: $EMSCRIPTEN_DIR"
+  echo "Set EMSDK or EMSCRIPTEN, or install emsdk."
+  exit 1
+fi
 
 # Emscripten cmake
 EMSCRIPTEN_CMAKE_DIR=$EMSCRIPTEN_DIR/cmake/Modules/Platform/Emscripten.cmake

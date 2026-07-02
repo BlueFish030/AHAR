@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 source "${EMSDK:-$HOME/emsdk}/emsdk_env.sh"
+export EMSDK="${EMSDK:-$HOME/emsdk}"
 
 if [ ! -d "src/libs/build/opencv" ]; then
   echo "Building native deps (first run may take 30–60 min)..."
